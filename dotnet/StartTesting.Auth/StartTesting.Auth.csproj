@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+    <ProjectReference Include="../StartTesting.Core/StartTesting.Core.csproj" />
+    <ProjectReference Include="../StartTesting.Diagnostics/StartTesting.Diagnostics.csproj" />
+  </ItemGroup>
+</Project>

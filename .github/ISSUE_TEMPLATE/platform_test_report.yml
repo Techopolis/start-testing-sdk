@@ -1,0 +1,48 @@
+name: Windows test report
+description: Tell us how the Start Testing SDK behaved on a real Windows machine
+labels: ["windows-test-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Windows support has not been run on a real machine by its authors. A report of what worked and what did not is a real contribution, even if everything worked.
+  - type: input
+    id: version
+    attributes:
+      label: Windows version
+    validations:
+      required: true
+  - type: input
+    id: dotnet
+    attributes:
+      label: .NET or Python version
+    validations:
+      required: true
+  - type: checkboxes
+    id: worked
+    attributes:
+      label: What worked
+      options:
+        - label: The .NET tests ran (dotnet run --project dotnet/Tests)
+        - label: The WPF sample built and opened
+        - label: The WinUI sample built and opened
+        - label: The Python tests ran
+        - label: The wxPython sample opened its report window
+        - label: A sample error offered a report
+        - label: The report could be reviewed before sending
+        - label: ChatGPT sign-in opened the browser and returned to the app
+        - label: A screen reader announced the report window and its status messages
+  - type: textarea
+    id: failed
+    attributes:
+      label: What did not work
+      description: Include any error text exactly as it appeared.
+    validations:
+      required: false
+  - type: input
+    id: assistive-tech
+    attributes:
+      label: Assistive technology used, if any
+      description: For example NVDA, JAWS, or Narrator.
+    validations:
+      required: false

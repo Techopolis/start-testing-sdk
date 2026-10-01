@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Techopolis/start-testing-sdk/security/advisories/new
+    about: Please report security problems privately, not in a public issue.
+  - name: Start Testing account or project questions
+    url: https://starttesting.net
+    about: Questions about your Start Testing account, projects, or SDK keys go to Start Testing.

@@ -1,0 +1,9 @@
+Start Testing SDK
+Copyright 2026 Techopolis Online Solutions
+
+Original SDK implementation. The proprietary Start Testing web application and
+its iOS client were inspected to understand existing issue fields, project access,
+and attachments. Their proprietary source code is not included in this repository.
+
+Dependency licenses remain with their respective authors. See
+ docs/source-review.md for implementation references and attribution.

@@ -1,0 +1,50 @@
+name: SDK checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e "python[dev,chatgpt]"
+      - run: python -m ruff check python samples/python-cli samples/python-wx scripts
+      - run: python -m pytest python/tests -q
+      - run: python -m build python
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -e "python[dev,chatgpt,wx,packaging]"
+      - run: python -m pytest python/tests -q
+        env:
+          RUN_WX_TESTS: '1'
+      - run: python scripts/package_python_sample.py --environment beta
+      - run: python scripts/package_python_sample.py --environment production
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project dotnet/Tests
+      - run: dotnet build samples/windows-wpf
+      - run: dotnet build samples/windows-winui/StartTesting.WinUISample.csproj -p:Platform=x64
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: swift test --package-path apple
+      - run: swift build --package-path samples/macos
+      - run: xcodebuild -project samples/ios/StartTestingSDKSample.xcodeproj -scheme StartTestingSDKSample -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

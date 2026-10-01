@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "starttesting"
+version = "0.1.0a1"
+description = "Privacy-conscious application diagnostics and reviewed QA reporting"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{name = "Techopolis Online Solutions"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+wx = ["wxPython>=4.2,<5"]
+chatgpt = ["PyJWT[crypto]>=2.10,<3", "keyring>=25.6,<26", "httpx>=0.28,<1"]
+dev = ["pytest>=8.3,<10", "ruff>=0.12,<1", "build>=1.2,<2", "jsonschema>=4.23,<5"]
+packaging = ["pyinstaller>=6.12,<7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/starttesting"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
