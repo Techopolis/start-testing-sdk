@@ -6,7 +6,7 @@ This repository is a working 0.1 alpha, not a completed production V1.
 | --- | --- | --- |
 | Python | Bounded diagnostics, privacy filters, frozen incidents, authorization protocols, mock backend, reviewed reports, automatic logs, retries, wx UI | Real service adapter; Windows runtime/accessibility evidence |
 | Swift | Core actor workflow, storage, privacy, native SwiftUI reporter and alerts, real tester OAuth/service adapter, project key reporting without an account, system log attachment, ChatGPT sign-in and drafting | Deployment and live verification of project key routes; live ChatGPT account verification; user-selected attachments; complete UI validation |
-| .NET | Core workflow, storage, privacy, mocks, logging, OAuth, WinUI reporter and WPF/WinUI samples | Real service adapter; full Windows build/runtime evidence; selected attachments; complete accessibility validation |
+| .NET | Core workflow, storage, privacy, mocks, logging, OAuth, WinUI reporter and WPF/WinUI samples, project key reporting without an account, help desk tickets, prompts for logged errors, AI log monitor | Tester sign-in to Start Testing; tester mode screen; live verification against the service; use on a real Windows machine; selected attachments; complete accessibility validation |
 | ChatGPT | Python and .NET desktop implementations; synthetic OAuth tests | Live account verification, deployment eligibility review, native macOS implementation; iOS remains gated |
 | Distribution | Apache-2.0 source and package metadata; local macOS PyInstaller examples | Registry publication, signed platform artifacts, release audit |
 

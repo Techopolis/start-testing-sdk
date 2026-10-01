@@ -46,18 +46,32 @@ public sealed class Reporter(StartTestingClient client, IIssueService issues,
             if (client.Configuration.ExternalFeedback == ExternalFeedback.Disabled ||
                 (incident.Origin == "manual" && client.Configuration.ExternalFeedback == ExternalFeedback.ErrorsOnly))
                 throw new UnauthorizedAccessException("Feedback is disabled for this action");
-            draft = new(Description: draft.Description);
+            // Self-declared contact details are the only metadata accepted without a grant.
+            var contact = ImmutableDictionary.CreateBuilder<string, string>();
+            foreach (var key in new[] { "reporter", "email" })
+                if (draft.Metadata?.GetValueOrDefault(key)?.Trim() is { Length: > 0 } value)
+                    contact[key] = value[..Math.Min(value.Length, key == "email" ? 320 : 120)];
+            if (contact.TryGetValue("email", out var email) && !System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^\s@]+@[^\s@]+\.[^\s@]+$"))
+                throw new ArgumentException("Enter a valid email address or leave it empty");
+            if (client.InstallReporting)
+            {
+                if (string.IsNullOrWhiteSpace(draft.Title)) throw new ArgumentException("Title is required");
+                draft = draft with { Metadata = contact.ToImmutable() };
+            }
+            else draft = new(Description: draft.Description, Metadata: contact.ToImmutable());
         }
         if (string.IsNullOrWhiteSpace(draft.Description)) throw new ArgumentException("Description is required");
         draft = Sanitize(draft);
-        var bundle = diagnosticConsent ? DiagnosticBundle.Create(incident, client.Redactor,
-            client.FullLogsEnabled && incident.TesterSubject == subject, mode != UserMode.AuthenticatedTester) : null;
+        var bundle = diagnosticConsent && (client.DetailedReports || client.Configuration.FeedbackDiagnostics)
+            ? DiagnosticBundle.Create(incident, client.Redactor,
+                client.FullLogsEnabled && incident.TesterSubject == subject, !client.DetailedReports) : null;
         return new(Guid.NewGuid().ToString(), incident, draft, mode, subject, bundle);
     }
     private IssueDraft Sanitize(IssueDraft draft) => draft with {
         Title = client.Redactor.Text(draft.Title), Description = client.Redactor.Text(draft.Description),
         ExpectedBehavior = client.Redactor.Text(draft.ExpectedBehavior), ActualBehavior = client.Redactor.Text(draft.ActualBehavior),
-        StepsToReproduce = client.Redactor.Text(draft.StepsToReproduce), Metadata = client.Redactor.Fields(draft.Metadata) };
+        StepsToReproduce = client.Redactor.Text(draft.StepsToReproduce),
+        Metadata = draft.Metadata is null ? null : client.Redactor.Fields(draft.Metadata) };
     public static ReviewApproval Approve(PreparedReport report) => new(report.Fingerprint);
     public async Task<SubmissionResult> SubmitAsync(PreparedReport report, ReviewApproval approval, CancellationToken ct = default)
     {
@@ -71,7 +85,7 @@ public sealed class Reporter(StartTestingClient client, IIssueService issues,
             if (!Wire.Encode(Sanitize(report.Draft)).SequenceEqual(Wire.Encode(report.Draft)))
                 throw new ArgumentException("Privacy rules changed; review again");
             var fresh = report.Bundle is null ? null : DiagnosticBundle.Create(report.Incident, client.Redactor,
-                client.FullLogsEnabled && report.Incident.TesterSubject == report.Subject, report.Mode != UserMode.AuthenticatedTester);
+                client.FullLogsEnabled && report.Incident.TesterSubject == report.Subject, !client.DetailedReports);
             if (report.Bundle is not null && (report.Bundle.Uploads.Length != fresh!.Uploads.Length || !report.Bundle.Uploads.Zip(fresh.Uploads).All(pair => pair.First.Data.SequenceEqual(pair.Second.Data))))
                 throw new ArgumentException("Privacy rules changed; review again");
             foreach (var upload in report.Bundle?.Uploads ?? [])
@@ -82,7 +96,7 @@ public sealed class Reporter(StartTestingClient client, IIssueService issues,
                 if (progress.Count >= 100) throw new InvalidOperationException("Create a new reporter after 100 reports");
                 var reference = report.Mode == UserMode.AuthenticatedTester
                     ? await issues.CreateIssueAsync(client.Options.ProjectId, client.Grant!, report.Draft, report.RequestId, ct)
-                    : await feedback.SubmitFeedbackAsync(client.Options.ProjectId, report.Draft.Description, report.Incident.Origin, report.RequestId, ct);
+                    : await feedback.SubmitReportAsync(client.Options.ProjectId, report.Draft, report.Incident.Origin, report.RequestId, ct);
                 state = (report.Fingerprint, reference, []);
                 progress.Add(report.RequestId, state);
             }

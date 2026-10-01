@@ -55,5 +55,6 @@ try
     }
 }
 finally { Directory.Delete(path, true); }
+await InstallChecks.RunAsync(Check);
 await OAuthChecks.RunAsync();
 Console.WriteLine($"{assertions} .NET core assertions and OAuth checks passed");

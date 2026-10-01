@@ -130,10 +130,17 @@ implemented in Python.
 
 ### Windows and .NET (experimental, untested)
 
-**Windows support is experimental. It has never been run on a real Windows
-machine.** The .NET libraries contain the core workflow, ChatGPT sign-in, and a
-WinUI reporter, all against mock services. Expect rough edges, and please file a
-*Windows test report* issue saying what worked and what did not.
+**Windows support is experimental. Nobody has used it on a real Windows machine
+with a screen reader.** The .NET libraries build and pass their tests on a hosted
+Windows machine. They include reporting without sign-in using a project key, help
+desk tickets from production builds, prompts for errors the app logs, ChatGPT
+sign-in and drafting, and ChatGPT watching the app's own log. See
+[docs/windows.md](docs/windows.md).
+
+Not in .NET yet: signing in to Start Testing as a tester, the hidden tester mode
+screen, and attaching an operating system log. On Windows the SDK reads what your
+app logs through `ILogger`, not a system log. Expect rough edges, and please file
+a *Windows test report* issue saying what worked and what did not.
 
 ## Add it to an Apple app
 

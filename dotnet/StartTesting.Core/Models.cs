@@ -51,7 +51,12 @@ public sealed record FieldDefinition(string Key, string Label, string Capability
     ImmutableArray<string> Choices);
 public sealed record ProjectConfiguration(string ProjectId, ExternalFeedback ExternalFeedback,
     ImmutableHashSet<AppEnvironment> TesterEnvironments, bool FullLogsEnabled,
-    ImmutableArray<FieldDefinition> Fields)
+    ImmutableArray<FieldDefinition> Fields,
+    // Development and beta builds may send full reports and logs without a tester
+    // account. Set only by a service that authenticates the build itself.
+    bool InstallDiagnostics = false,
+    // False when restricted feedback goes somewhere that takes no files, such as a help desk.
+    bool FeedbackDiagnostics = true)
 {
     public static ProjectConfiguration Restricted(string projectId) => new(projectId,
         ExternalFeedback.Disabled, [AppEnvironment.Development, AppEnvironment.Beta], false, []);
@@ -95,6 +100,11 @@ public interface IFeedbackService
 {
     Task<ReportReference> SubmitFeedbackAsync(string projectId, string description, string origin,
         string idempotencyKey, CancellationToken cancellationToken = default);
+    // A full report from an install without a tester account. Metadata carries only
+    // the optional self-declared "reporter" name and "email".
+    Task<ReportReference> SubmitReportAsync(string projectId, IssueDraft draft, string origin,
+        string idempotencyKey, CancellationToken cancellationToken = default) =>
+        SubmitFeedbackAsync(projectId, draft.Description, origin, idempotencyKey, cancellationToken);
 }
 public interface IAttachmentService
 {
@@ -105,6 +115,12 @@ public interface ISessionService
 {
     Task<ImmutableArray<string>> SessionsAsync(string projectId, CapabilitySet grant,
         CancellationToken cancellationToken = default);
+}
+// Reads a redacted log excerpt and decides whether it shows a problem worth reporting.
+// Returns null when it does not, or when no AI account is connected.
+public interface IAILogTriage
+{
+    Task<AIDraft?> TriageAsync(string sanitizedContext, CancellationToken cancellationToken = default);
 }
 public interface IAIProvider
 {
