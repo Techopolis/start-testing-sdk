@@ -73,8 +73,8 @@ class DiagnosticStorage:
             if os.name == "nt":
                 import msvcrt
 
-                self._lockfile.write(b"0")
-                self._lockfile.flush()
+                # Lock the first byte without writing. Windows allows locking past the
+                # end of a file, and writing to a byte another process holds fails.
                 self._lockfile.seek(0)
                 msvcrt.locking(self._lockfile.fileno(), msvcrt.LK_NBLCK, 1)
             else:
