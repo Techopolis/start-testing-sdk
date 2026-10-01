@@ -259,6 +259,11 @@ final class ChatGPTTests: XCTestCase, @unchecked Sendable {
     XCTAssertFalse(String(decoding: store.load()!, as: UTF8.self).contains("refresh-1"))
   }
 
+  func testDraftPunctuationIsPlain() {
+    XCTAssertEqual(
+      Reporter.plainPunctuation("No details \u{2014} build 79 \u{201C}ok\u{201D} it\u{2019}s\u{2026}"),
+      "No details - build 79 \"ok\" it's...")
+  }
   func testAIContextIsBoundedRedactedAndGated() async throws {
     let backend = MockServices()
     let client = StartTestingClient(

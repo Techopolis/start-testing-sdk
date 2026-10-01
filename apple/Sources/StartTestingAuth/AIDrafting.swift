@@ -69,13 +69,24 @@ extension Reporter {
   {
     guard await aiDraftingAllowed else { throw SDKError.unauthorized }
     let draft = try await provider.draft(sanitizedContext: context, model: model)
-    let clean = client.redactor
+    let redactor = client.redactor
+    func clean(_ text: String) -> String { Self.plainPunctuation(redactor.text(text)) }
     return AIDraft(
-      title: clean.text(draft.title), summary: clean.text(draft.summary),
-      observedBehavior: clean.text(draft.observedBehavior),
-      expectedBehavior: clean.text(draft.expectedBehavior),
-      reproductionContext: clean.text(draft.reproductionContext),
-      relevantDiagnostics: clean.text(draft.relevantDiagnostics),
-      possibleHypothesis: clean.text(draft.possibleHypothesis))
+      title: clean(draft.title), summary: clean(draft.summary),
+      observedBehavior: clean(draft.observedBehavior),
+      expectedBehavior: clean(draft.expectedBehavior),
+      reproductionContext: clean(draft.reproductionContext),
+      relevantDiagnostics: clean(draft.relevantDiagnostics),
+      possibleHypothesis: clean(draft.possibleHypothesis))
+  }
+  /// Models favour typographic dashes, curly quotes and ellipses, which screen
+  /// readers announce badly. Drafts use the plain keyboard characters instead.
+  static func plainPunctuation(_ text: String) -> String {
+    var result = text
+    for (from, to) in [
+      ("\u{2014}", "-"), ("\u{2013}", "-"), ("\u{2018}", "'"), ("\u{2019}", "'"),
+      ("\u{201C}", "\""), ("\u{201D}", "\""), ("\u{2026}", "..."), ("\u{00A0}", " "),
+    ] { result = result.replacingOccurrences(of: from, with: to) }
+    return result
   }
 }
