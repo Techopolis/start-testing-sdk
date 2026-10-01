@@ -13,6 +13,7 @@ public struct ReporterView: View {
   @State private var chatModels: [ChatGPTModel] = []
   @AppStorage("StartTesting.chatGPTModel") private var chatModel = ""
   @AppStorage("StartTesting.chatGPTAutoDraft") private var chatAutoDraft = false
+  @AppStorage(AILogMonitor.enabledKey) private var chatWatchLogs = false
   @Environment(\.dismiss) private var dismiss
   @State private var draft = IssueDraft()
   @State private var mode: UserMode = .productionSupport
@@ -92,6 +93,9 @@ public struct ReporterView: View {
                   ForEach(chatModels) { Text($0.displayName).tag($0.slug) }
                 }
               }
+              Toggle("Let ChatGPT watch the logs for problems", isOn: $chatWatchLogs)
+                .accessibilityHint(
+                  "When on, new failures this app writes to its own log are sent to ChatGPT in a short redacted summary. System messages are left out. If it finds a problem, you are offered a report it has drafted.")
               Toggle("Draft automatically when an error is reported", isOn: $chatAutoDraft)
                 .accessibilityHint(
                   "When on, a short redacted summary of each error is sent to ChatGPT as soon as you open its report")
@@ -183,6 +187,13 @@ public struct ReporterView: View {
       consent = detailed && (mode != .authenticatedTester || canAttach)
       draft.title = incident?.safeMessage ?? ""
       draft.description = incident?.safeMessage ?? ""
+      // A problem the AI noticed arrives with its draft already written.
+      var prefilled = false
+      if let incident, let suggestion = await reporter.client.suggestedDraft(for: incident.incidentId)
+      {
+        draft = suggestion
+        prefilled = true
+      }
       aiAllowed = await reporter.aiDraftingAllowed
       if aiAllowed, let chatGPT, let account = await chatGPT.active {
         chatAccount = account
@@ -190,6 +201,10 @@ public struct ReporterView: View {
         try? await loadChatModels(chatGPT, account)
       }
       // The tester opted in once, so an error report arrives with a draft to review.
+      if prefilled {
+        announce("ChatGPT noticed this in the logs and drafted the report. Review and edit it before submitting.")
+        return
+      }
       if chatAutoDraft, chatAccount != nil, !chatModel.isEmpty, let incident,
         incident.origin == "error",
         let context = try? await reporter.aiContext(incident: incident, notes: draft.description)

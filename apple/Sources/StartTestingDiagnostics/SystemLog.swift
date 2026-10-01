@@ -48,6 +48,8 @@ public enum SystemLog {
     public let subsystem: String
     public let category: String
     public let message: String
+    /// Logged at error or fault level.
+    public let isError: Bool
   }
   /// Error and fault lines this process logged under the given subsystems after
   /// `since`. Limiting to the app's own subsystems keeps out the routine errors
@@ -55,13 +57,24 @@ public enum SystemLog {
   public static func errors(since: Date, subsystems: Set<String>, limit: Int = 20)
     -> [LoggedError]
   {
-    guard !subsystems.isEmpty,
-      let store = try? OSLogStore(scope: .currentProcessIdentifier)
-    else { return [] }
+    guard !subsystems.isEmpty else { return [] }
+    return entries(since: since, subsystems: subsystems, errorsOnly: true, limit: limit)
+  }
+  /// The most recent lines of any level the given subsystems logged after `since`.
+  public static func recent(since: Date, subsystems: Set<String>, limit: Int = 60)
+    -> [LoggedError]
+  {
+    guard !subsystems.isEmpty else { return [] }
+    return Array(
+      entries(since: since, subsystems: subsystems, errorsOnly: false, limit: 5000).suffix(limit))
+  }
+  private static func entries(
+    since: Date, subsystems: Set<String>, errorsOnly: Bool, limit: Int
+  ) -> [LoggedError] {
+    guard let store = try? OSLogStore(scope: .currentProcessIdentifier) else { return [] }
     let names = subsystems.sorted()
     let format =
-      "date > %@ AND ("
-      + names.map { _ in "subsystem == %@" }.joined(separator: " OR ") + ")"
+      "date > %@ AND (" + names.map { _ in "subsystem == %@" }.joined(separator: " OR ") + ")"
     guard
       let entries = try? store.getEntries(
         at: store.position(date: since),
@@ -70,12 +83,13 @@ public enum SystemLog {
     var found: [LoggedError] = []
     for entry in entries {
       guard let log = entry as? OSLogEntryLog, log.date > since,
-        log.level == .error || log.level == .fault, subsystems.contains(log.subsystem)
+        !errorsOnly || log.level == .error || log.level == .fault,
+        subsystems.contains(log.subsystem)
       else { continue }
       found.append(
         LoggedError(
           date: log.date, subsystem: log.subsystem, category: log.category,
-          message: log.composedMessage))
+          message: log.composedMessage, isError: log.level == .error || log.level == .fault))
       if found.count >= limit { break }
     }
     return found

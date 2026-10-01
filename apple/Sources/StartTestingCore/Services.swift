@@ -42,6 +42,11 @@ public protocol AttachmentService: Sendable {
 public protocol SessionService: Sendable {
   func sessions(projectId: String, grant: CapabilitySet) async throws -> [String]
 }
+/// Reads a redacted log excerpt and decides whether it shows a problem worth
+/// reporting. Returns nil when it does not, or when no AI account is connected.
+public protocol AILogTriage: Sendable {
+  func triage(sanitizedContext: Data) async throws -> AIDraft?
+}
 public protocol AIProvider: Sendable {
   func draft(sanitizedContext: Data, model: String) async throws -> AIDraft
 }

@@ -92,7 +92,12 @@ Nothing is submitted just because it was captured.
 Testers can optionally sign in with their own ChatGPT account and have it draft
 the report from the captured diagnostics. They see the exact text that will be
 sent to ChatGPT first, and they edit the draft before submitting. A tester can
-also choose to have every error report drafted automatically. Only a short,
+also choose to have every error report drafted automatically.
+
+A tester can also let ChatGPT watch the app's log. It reads only the lines the
+app's own code wrote, never the operating system's, and when it judges that the
+app is failing at something it offers a report it has already drafted. The tester
+still reviews and sends it. Only a short,
 redacted excerpt is sent; the attachments are not. ChatGPT credentials stay in
 the device Keychain and never reach Start Testing. This is offered to testers
 only, never in the App Store build's support form.

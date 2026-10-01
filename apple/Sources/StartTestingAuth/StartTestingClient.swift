@@ -50,6 +50,7 @@ public actor StartTestingClient {
   public private(set) var persistenceFailures = 0
   private var logWatch: Task<Void, Never>?
   private var lastLogPrompt: Date = .distantPast
+  private var suggested: [String: IssueDraft] = [:]
   public init(
     projectId: String, build: BuildInfo = BuildResolver.resolve(), options: Options = Options(),
     projects: (any ProjectService)? = nil, authorization: (any AuthorizationService)? = nil,
@@ -215,6 +216,24 @@ public actor StartTestingClient {
       onIncident?(incident)
     }
   }
+  /// Offer a report for a problem an AI noticed in the logs. The draft it wrote is
+  /// kept with the incident so the report form opens with it filled in. Nothing is
+  /// sent unless the person reviews and submits it.
+  @discardableResult public func noticed(_ draft: IssueDraft) -> Incident? {
+    guard detailedReports else { return nil }
+    let incident = freeze(
+      severity: .reportable, type: "AINoticed",
+      message: String(redactor.text(draft.title).prefix(160)),
+      summary: redactor.text(draft.description), stack: "")
+    guard shouldPrompt(incident) else { return nil }
+    if suggested.count >= 20, let oldest = suggested.keys.sorted().first {
+      suggested.removeValue(forKey: oldest)
+    }
+    suggested[incident.incidentId] = draft
+    onIncident?(incident)
+    return incident
+  }
+  public func suggestedDraft(for incidentId: String) -> IssueDraft? { suggested[incidentId] }
   public func manualIncident() -> Incident {
     freeze(
       severity: .informational, type: "ManualReport", message: "", summary: "", stack: "",

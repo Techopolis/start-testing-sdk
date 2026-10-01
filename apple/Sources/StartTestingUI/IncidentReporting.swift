@@ -61,7 +61,9 @@ private struct IncidentReporting: ViewModifier {
         }
       } message: { item in
         Text(
-          item.severity == .fatal
+          item.errorType == "AINoticed"
+            ? "ChatGPT noticed a possible problem in the logs: \(item.safeMessage). Would you like to review the report it drafted?"
+            : item.severity == .fatal
             ? "The app closed unexpectedly during the previous session. Would you like to send a diagnostic report?"
             : tester
               ? "Something went wrong. Start Testing captured diagnostic information for this incident. Would you like to report it?"

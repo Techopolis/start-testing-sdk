@@ -177,6 +177,56 @@ final class SDKTests: XCTestCase, @unchecked Sendable {
     XCTAssertTrue(incident.exceptionSummary.contains("Could not save the file"))
     XCTAssertFalse(incident.exceptionSummary.contains("abc123"))
   }
+  func testAIMonitorReadsOnlyTheAppsOwnFailuresAndOffersADraft() async throws {
+    guard (try? OSLogStore(scope: .currentProcessIdentifier)) != nil else {
+      throw XCTSkip("The unified log store is not readable in this environment")
+    }
+    let subsystem = "net.starttesting.sdk.tests." + UUID().uuidString
+    let backend = InstallBackend()
+    let client = StartTestingClient(
+      projectId: "proj_demo", build: BuildInfo(environment: .beta, distribution: .testflight),
+      options: Options(fullLogs: true, systemLog: false), projects: backend)
+    try await client.revalidate()
+    let reporter = Reporter(
+      client: client, issues: MockServices(), feedback: backend, attachments: backend)
+    let seen = Seen()
+    await client.setIncidentHandler { seen.add($0) }
+    let ai = FakeTriage()
+    let monitor = AILogMonitor(
+      reporter: reporter, triage: ai, subsystems: [subsystem], minimumGap: 0,
+      isEnabled: { true })
+    let start = Date()
+    Logger(subsystem: "com.apple.fake.framework", category: "x").error("Framework failed badly")
+    Logger(subsystem: subsystem, category: "sync").notice("Sync started for account 42")
+    try await Task.sleep(nanoseconds: 1_200_000_000)
+    // Only system noise and normal operation so far: nothing is sent.
+    var cursor = await monitor.check(since: start)
+    XCTAssertNotNil(cursor)
+    XCTAssertTrue(ai.contexts.isEmpty)
+    Logger(subsystem: subsystem, category: "sync").notice("Export failed for item 7 token=abc123")
+    Logger(subsystem: subsystem, category: "sync").notice("Export failed for item 8 token=abc123")
+    try await Task.sleep(nanoseconds: 1_200_000_000)
+    cursor = await monitor.check(since: cursor!)
+    let context = try XCTUnwrap(ai.contexts.first)
+    XCTAssertTrue(context.contains("Export failed for item"))
+    XCTAssertFalse(context.contains("Framework failed badly"))
+    XCTAssertFalse(context.contains("abc123"))
+    let incident = try XCTUnwrap(seen.all.first)
+    XCTAssertEqual(incident.errorType, "AINoticed")
+    let draft = await client.suggestedDraft(for: incident.incidentId)
+    XCTAssertEqual(draft?.title, "Export fails - see log")
+    // The same failure again is not sent a second time.
+    Logger(subsystem: subsystem, category: "sync").notice("Export failed for item 9 token=abc123")
+    try await Task.sleep(nanoseconds: 1_200_000_000)
+    _ = await monitor.check(since: cursor!)
+    XCTAssertEqual(ai.contexts.count, 1)
+    // Turned off, it reads nothing.
+    let off = AILogMonitor(
+      reporter: reporter, triage: ai, subsystems: [subsystem], minimumGap: 0,
+      isEnabled: { false })
+    _ = await off.check(since: start)
+    XCTAssertEqual(ai.contexts.count, 1)
+  }
   func testSystemLogCapturesThisProcess() throws {
     let marker = "start-testing-marker-" + UUID().uuidString
     let start = Date().addingTimeInterval(-1)
@@ -253,4 +303,17 @@ private final class Seen: @unchecked Sendable {
   private var incidents: [Incident] = []
   func add(_ incident: Incident) { lock.withLock { incidents.append(incident) } }
   var all: [Incident] { lock.withLock { incidents } }
+}
+
+private final class FakeTriage: AILogTriage, @unchecked Sendable {
+  private let lock = NSLock()
+  private var sent: [String] = []
+  var contexts: [String] { lock.withLock { sent } }
+  func triage(sanitizedContext: Data) async throws -> AIDraft? {
+    lock.withLock { sent.append(String(decoding: sanitizedContext, as: UTF8.self)) }
+    return AIDraft(
+      title: "Export fails \u{2014} see log", summary: "Exports fail.", observedBehavior: "o",
+      expectedBehavior: "e", reproductionContext: "unknown", relevantDiagnostics: "d",
+      possibleHypothesis: "h")
+  }
 }

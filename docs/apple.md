@@ -133,6 +133,26 @@ a minute. Other subsystems are ignored, because system frameworks log routine
 errors constantly. This does nothing outside tester mode, and it cannot see
 crashes or problems that are never logged.
 
+## Letting ChatGPT watch the logs
+
+A tester who has connected ChatGPT can turn on "Let ChatGPT watch the logs for
+problems". Start the monitor with the app's own log subsystems:
+
+```swift
+let monitor = AILogMonitor(
+    reporter: reporter, triage: ChatGPTLogTriage(auth: chatGPT),
+    subsystems: ["com.example.app"])
+await monitor.start()
+```
+
+Once a minute it reads only those subsystems. Lines from system frameworks are
+never read or sent. When the app logged something that looks like a failure and
+has not been sent before, a short redacted excerpt goes to ChatGPT, which decides
+whether it is a real problem. If so, the tester is offered a report with the draft
+already written. It checks at most every two minutes and fifteen times an hour,
+never submits anything itself, and does nothing outside tester mode or while the
+switch is off.
+
 ## ChatGPT drafting
 
 A tester who has connected ChatGPT can turn on "Draft automatically when an error
