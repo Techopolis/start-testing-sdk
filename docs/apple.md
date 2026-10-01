@@ -119,7 +119,25 @@ process's own unified log from two minutes before the issue to one minute after
 It cannot include other processes or a previous launch, and values logged as
 private remain `<private>`. It is redacted and capped at 2 MB, keeping the newest lines.
 
+## Noticing errors automatically
+
+`await client.record(error, ...)` is how the app reports a failure it caught. In
+tester mode the SDK can also notice errors the app only wrote to its log:
+
+```swift
+await client.watchSystemLogErrors(subsystems: ["com.example.app"])
+```
+
+Error and fault lines logged under those subsystems offer a report, at most once
+a minute. Other subsystems are ignored, because system frameworks log routine
+errors constantly. This does nothing outside tester mode, and it cannot see
+crashes or problems that are never logged.
+
 ## ChatGPT drafting
+
+A tester who has connected ChatGPT can turn on "Draft automatically when an error
+is reported". Opening the report for an error then sends the redacted excerpt to
+ChatGPT straight away and fills in the draft for review. It is off by default.
 
 ```swift
 import StartTestingChatGPT

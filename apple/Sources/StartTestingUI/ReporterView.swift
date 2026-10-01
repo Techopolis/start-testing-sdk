@@ -11,7 +11,8 @@ public struct ReporterView: View {
   @State private var aiAllowed = false
   @State private var chatAccount: ChatGPTConnection?
   @State private var chatModels: [ChatGPTModel] = []
-  @State private var chatModel = ""
+  @AppStorage("StartTesting.chatGPTModel") private var chatModel = ""
+  @AppStorage("StartTesting.chatGPTAutoDraft") private var chatAutoDraft = false
   @Environment(\.dismiss) private var dismiss
   @State private var draft = IssueDraft()
   @State private var mode: UserMode = .productionSupport
@@ -91,6 +92,9 @@ public struct ReporterView: View {
                   ForEach(chatModels) { Text($0.displayName).tag($0.slug) }
                 }
               }
+              Toggle("Draft automatically when an error is reported", isOn: $chatAutoDraft)
+                .accessibilityHint(
+                  "When on, a short redacted summary of each error is sent to ChatGPT as soon as you open its report")
               Button("Draft with ChatGPT") { Task { await reviewChatContext() } }
                 .disabled(chatModel.isEmpty)
                 .accessibilityHint(
@@ -185,6 +189,15 @@ public struct ReporterView: View {
         // The saved connection may have expired; the form stays usable either way.
         try? await loadChatModels(chatGPT, account)
       }
+      // The tester opted in once, so an error report arrives with a draft to review.
+      if chatAutoDraft, chatAccount != nil, !chatModel.isEmpty, let incident,
+        incident.origin == "error",
+        let context = try? await reporter.aiContext(incident: incident, notes: draft.description)
+      {
+        announce("ChatGPT is drafting this report.")
+        await draftWithChat(context)
+        return
+      }
       announce("Diagnostics captured. Review before submitting.")
     } catch { announce("Reporting options could not be loaded.") }
   }
@@ -238,8 +251,9 @@ public struct ReporterView: View {
   }
   private func draftWithChat(_ context: Data) async {
     guard let chatGPT, let chatAccount else { return }
+    let wasBusy = busy
     busy = true
-    defer { busy = false }
+    defer { busy = wasBusy }
     do {
       let result = try await reporter.aiDraft(
         provider: ChatGPTProvider(auth: chatGPT, connection: chatAccount), context: context,

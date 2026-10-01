@@ -154,6 +154,29 @@ final class SDKTests: XCTestCase, @unchecked Sendable {
     XCTAssertGreaterThan(redacted.count, 9000)
     XCTAssertFalse(redacted.contains("secret123"))
   }
+  func testLoggedErrorsPromptOnlyForWatchedSubsystemsInTesterMode() async throws {
+    let subsystem = "net.starttesting.sdk.tests." + UUID().uuidString
+    let backend = InstallBackend()
+    let client = StartTestingClient(
+      projectId: "proj_demo", build: BuildInfo(environment: .beta, distribution: .testflight),
+      options: Options(fullLogs: true, systemLog: false), projects: backend)
+    try await client.revalidate()
+    guard (try? OSLogStore(scope: .currentProcessIdentifier)) != nil else { throw XCTSkip("The unified log store is not readable in this environment") }
+    let seen = Seen()
+    await client.setIncidentHandler { seen.add($0) }
+    await client.watchSystemLogErrors(subsystems: [subsystem], interval: 0.5)
+    try await Task.sleep(nanoseconds: 800_000_000)
+    Logger(subsystem: "net.starttesting.sdk.tests.other", category: "x").error("Unwatched failure")
+    Logger(subsystem: subsystem, category: "save").info("Not an error")
+    Logger(subsystem: subsystem, category: "save").error("Could not save the file token=abc123")
+    for _ in 0..<40 where seen.all.isEmpty { try await Task.sleep(nanoseconds: 250_000_000) }
+    await client.stopWatchingSystemLog()
+    let incident = try XCTUnwrap(seen.all.first)
+    XCTAssertEqual(seen.all.count, 1)
+    XCTAssertEqual(incident.errorType, "LoggedError")
+    XCTAssertTrue(incident.exceptionSummary.contains("Could not save the file"))
+    XCTAssertFalse(incident.exceptionSummary.contains("abc123"))
+  }
   func testSystemLogCapturesThisProcess() throws {
     let marker = "start-testing-marker-" + UUID().uuidString
     let start = Date().addingTimeInterval(-1)
@@ -223,4 +246,11 @@ private actor InstallBackend: ProjectService, FeedbackService, AttachmentService
     projectId: String, grant: CapabilitySet?, report: ReportReference, upload: Upload,
     idempotencyKey: String
   ) throws { uploads.append(upload) }
+}
+
+private final class Seen: @unchecked Sendable {
+  private let lock = NSLock()
+  private var incidents: [Incident] = []
+  func add(_ incident: Incident) { lock.withLock { incidents.append(incident) } }
+  var all: [Incident] { lock.withLock { incidents } }
 }

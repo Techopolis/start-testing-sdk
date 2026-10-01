@@ -48,6 +48,8 @@ public actor StartTestingClient {
   private var prompted: [String: Date] = [:]
   private var onIncident: (@Sendable (Incident) -> Void)?
   public private(set) var persistenceFailures = 0
+  private var logWatch: Task<Void, Never>?
+  private var lastLogPrompt: Date = .distantPast
   public init(
     projectId: String, build: BuildInfo = BuildResolver.resolve(), options: Options = Options(),
     projects: (any ProjectService)? = nil, authorization: (any AuthorizationService)? = nil,
@@ -173,6 +175,45 @@ public actor StartTestingClient {
       summary: summary, stack: stack)
     if severity != .fatal, shouldPrompt(incident) { onIncident?(incident) }
     return incident
+  }
+  /// In tester mode, notice errors the app writes to its own system log and offer a
+  /// report for them, the same as an error passed to `record(_:)`. Only the listed
+  /// subsystems are watched, so routine errors from system frameworks do not prompt.
+  /// At most one logged error prompts per minute.
+  public func watchSystemLogErrors(subsystems: Set<String>, interval: TimeInterval = 10) {
+    logWatch?.cancel()
+    guard !subsystems.isEmpty, interval > 0 else { return }
+    logWatch = Task { [weak self] in
+      var cursor = Date()
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+        guard let self, !Task.isCancelled else { return }
+        let since = cursor
+        cursor = Date()
+        guard await self.detailedReports else { continue }
+        let found = await Task.detached(priority: .utility) {
+          SystemLog.errors(since: since, subsystems: subsystems)
+        }.value
+        for entry in found { await self.loggedError(entry) }
+      }
+    }
+  }
+  public func stopWatchingSystemLog() {
+    logWatch?.cancel()
+    logWatch = nil
+  }
+  private func loggedError(_ entry: SystemLog.LoggedError) {
+    let summary = redactor.text("[" + entry.subsystem + ":" + entry.category + "] " + entry.message)
+    record(summary, type: .error, category: "system-log")
+    let now = clock()
+    guard now.timeIntervalSince(lastLogPrompt) >= 60 else { return }
+    let incident = freeze(
+      severity: .reportable, type: "LoggedError",
+      message: String(redactor.text(entry.message).prefix(160)), summary: summary, stack: "")
+    if shouldPrompt(incident) {
+      lastLogPrompt = now
+      onIncident?(incident)
+    }
   }
   public func manualIncident() -> Incident {
     freeze(

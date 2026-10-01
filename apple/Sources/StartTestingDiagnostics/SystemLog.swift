@@ -43,6 +43,43 @@ public enum SystemLog {
     let text = redactor.log(([header] + lines).joined(separator: "\n") + "\n")
     return Data(text.utf8.prefix(maxBytes + 4096))
   }
+  public struct LoggedError: Sendable {
+    public let date: Date
+    public let subsystem: String
+    public let category: String
+    public let message: String
+  }
+  /// Error and fault lines this process logged under the given subsystems after
+  /// `since`. Limiting to the app's own subsystems keeps out the routine errors
+  /// system frameworks log.
+  public static func errors(since: Date, subsystems: Set<String>, limit: Int = 20)
+    -> [LoggedError]
+  {
+    guard !subsystems.isEmpty,
+      let store = try? OSLogStore(scope: .currentProcessIdentifier)
+    else { return [] }
+    let names = subsystems.sorted()
+    let format =
+      "date > %@ AND ("
+      + names.map { _ in "subsystem == %@" }.joined(separator: " OR ") + ")"
+    guard
+      let entries = try? store.getEntries(
+        at: store.position(date: since),
+        matching: NSPredicate(format: format, argumentArray: [since as NSDate] + names))
+    else { return [] }
+    var found: [LoggedError] = []
+    for entry in entries {
+      guard let log = entry as? OSLogEntryLog, log.date > since,
+        log.level == .error || log.level == .fault, subsystems.contains(log.subsystem)
+      else { continue }
+      found.append(
+        LoggedError(
+          date: log.date, subsystem: log.subsystem, category: log.category,
+          message: log.composedMessage))
+      if found.count >= limit { break }
+    }
+    return found
+  }
   private static func level(_ level: OSLogEntryLog.Level) -> String {
     switch level {
     case .debug: "DEBUG"

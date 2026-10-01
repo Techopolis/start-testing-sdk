@@ -59,6 +59,14 @@ it seven times opens a screen that welcomes the tester, tells anyone who is not
 a tester to close it, and offers Start Testing sign-in. VoiceOver activations
 count the same as taps. Customers never see a tester option.
 
+### How an error is noticed
+
+The app tells the SDK when it catches a failure, and the SDK offers a report. In
+tester mode the SDK can also watch the app's own log and offer a report when the
+app logs an error, so failures nobody wired up are still noticed. It does not
+catch crashes, and it cannot know about problems that are never logged, such as
+a mislabeled button. Those are reported by hand, with the same logs attached.
+
 ### What a report contains
 
 When the person agrees to include diagnostics, a report attaches:
@@ -83,7 +91,8 @@ Nothing is submitted just because it was captured.
 
 Testers can optionally sign in with their own ChatGPT account and have it draft
 the report from the captured diagnostics. They see the exact text that will be
-sent to ChatGPT first, and they edit the draft before submitting. Only a short,
+sent to ChatGPT first, and they edit the draft before submitting. A tester can
+also choose to have every error report drafted automatically. Only a short,
 redacted excerpt is sent; the attachments are not. ChatGPT credentials stay in
 the device Keychain and never reach Start Testing. This is offered to testers
 only, never in the App Store build's support form.
