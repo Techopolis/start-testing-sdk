@@ -85,7 +85,7 @@ public actor StartTestingInstallService: ProjectService, FeedbackService, Attach
     public func submitReport(projectId: String, draft: IssueDraft, origin: String,
                              idempotencyKey: String) async throws -> ReportReference {
         guard testingBuild else {
-            return try await openTicket(draft: draft, idempotencyKey: idempotencyKey)
+            return try await submitSupportTicket(draft: draft, idempotencyKey: idempotencyKey)
         }
         struct Draft: Encodable {
             let title: String; let description: String; let expectedBehavior: String
@@ -110,9 +110,9 @@ public actor StartTestingInstallService: ProjectService, FeedbackService, Attach
             from: await send("/api/sdk/reports", method: "POST", body: body))
     }
 
-    /// A production problem becomes a help desk ticket. The team replies by email
-    /// when the person gave an address; no logs are sent on this path.
-    private func openTicket(draft: IssueDraft, idempotencyKey: String) async throws -> ReportReference {
+    /// Open a help desk ticket in any distribution, including TestFlight.
+    /// The team can reply when the person supplies an email. No logs are sent.
+    public func submitSupportTicket(draft: IssueDraft, idempotencyKey: String) async throws -> ReportReference {
         struct Payload: Encodable { let subject: String; let message: String }
         struct User: Encodable { let id: String; let name: String; let email: String }
         struct Context: Encodable {
